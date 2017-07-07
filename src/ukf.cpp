@@ -18,16 +18,16 @@ UKF::UKF() {
   use_radar_ = true;
 
   // initial state vector
-  x_ = VectorXd(5);
+  x_ = VectorXd::Zero(5);
 
   // initial covariance matrix
-  P_ = MatrixXd::Identity(5, 5);
+  P_ = MatrixXd::Identity(5, 5)*1;
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 0.2;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 0.2;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -43,7 +43,6 @@ UKF::UKF() {
 
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
-
   /**
   TODO:
 
@@ -56,7 +55,8 @@ UKF::UKF() {
   n_aug_ = 7;
   n_sig_ = 2*n_aug_+1;
   lambda_ = 3 - n_aug_;
-  Xsig_pred_ = MatrixXd::Zero(n_aug_, n_sig_);
+  Xsig_pred_ = MatrixXd::Zero(n_x_, n_sig_);
+  weights_ = VectorXd(n_sig_);
   weights_.fill(0.5/(lambda_+n_aug_));
   weights_(0) = lambda_/(lambda_+n_aug_);
 }
@@ -74,6 +74,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   Complete this function! Make sure you switch between lidar and radar
   measurements.
   */
+  if (!use_radar_ && meas_package.sensor_type_ == MeasurementPackage::RADAR)
+    return;
+  if (!use_laser_ && meas_package.sensor_type_ == MeasurementPackage::LASER)
+    return;
+
   VectorXd z = meas_package.raw_measurements_;
   if (!is_initialized_) {
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
@@ -142,7 +147,6 @@ void UKF::Prediction(double delta_t) {
   vector, x_. Predict sigma points, the state, and the state covariance matrix.
   */
   MatrixXd Xsig_aug = generateSigmaPoints();
-
   //predict sigma points
   for (int i=0; i<n_sig_; i++) {
       double px = Xsig_aug.col(i)[0];
@@ -171,10 +175,10 @@ void UKF::Prediction(double delta_t) {
       Xsig_pred_.col(i) = Xsig_aug.col(i).head(5) + d + u;
   }
 
-  VectorXd x_ = Xsig_pred_ * weights_;
+  x_ = Xsig_pred_ * weights_;
   //predict state covariance matrix
   MatrixXd d = Xsig_pred_.colwise() - x_;
-  MatrixXd P_ = MatrixXd::Zero(n_x_,n_x_);
+  P_ = MatrixXd::Zero(n_x_,n_x_);
   for (int i=0; i<n_sig_; i++) {
       d(3,i) = atan2(sin(d(3,i)),cos(d(3,i)));
       P_ += weights_(i) * d.col(i) * d.col(i).transpose();
@@ -246,7 +250,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
       VectorXd zdiff = Zsig.col(i) - z_pred;
       xdiff(3) = atan2(sin(xdiff(3)), cos(xdiff(3)));
       zdiff(1) = atan2(sin(zdiff(1)), cos(zdiff(1)));
-      Tc += weights_(i) * (Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose();
+      Tc += weights_(i) * xdiff * zdiff.transpose();
   }
   //calculate Kalman gain K;
   MatrixXd K = Tc * S.inverse();
