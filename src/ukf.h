@@ -63,6 +63,7 @@ public:
 
   ///* Augmented state dimension
   int n_aug_;
+  int n_sig_;
 
   ///* Sigma point spreading parameter
   double lambda_;
@@ -102,6 +103,8 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateRadar(MeasurementPackage meas_package);
+private:
+  Eigen::MatrixXd generateSigmaPoints(void);
 };
 
 #endif /* UKF_H */
