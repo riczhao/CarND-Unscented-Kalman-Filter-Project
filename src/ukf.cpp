@@ -12,7 +12,7 @@ using std::vector;
  */
 UKF::UKF() {
   // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = false;
+  use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
   use_radar_ = true;
@@ -21,10 +21,15 @@ UKF::UKF() {
   x_ = VectorXd::Zero(5);
 
   // initial covariance matrix
-  P_ = MatrixXd::Identity(5, 5)*1;
+  P_ = MatrixXd(5, 5);
+  P_ << 0.2, 0, 0, 0, 0,
+        0, 0.2, 0, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 0, 1, 0,
+        0, 0, 0, 0, 1;
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.2;
+  std_a_ = 0.3;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
   std_yawdd_ = 0.2;
@@ -198,6 +203,17 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the lidar NIS.
   */
+  MatrixXd H = MatrixXd(2,n_x_);
+  H << 1, 0, 0, 0, 0,
+       0, 1, 0, 0, 0;
+  MatrixXd R = MatrixXd(2,2);
+  R << std_laspx_*std_laspx_, 0,
+       0, std_laspy_*std_laspy_;
+  VectorXd y = meas_package.raw_measurements_ - H * x_;
+  MatrixXd S = H * P_ * H.transpose() + R;
+  MatrixXd k = P_ * H.transpose() * S.inverse();
+  x_ = x_ + k * y;
+  P_ -= k * H * P_;
 }
 
 /**
